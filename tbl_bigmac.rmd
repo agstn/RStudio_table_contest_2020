@@ -1,0 +1,440 @@
+---
+title:   "<h3> <a href='https://blog.rstudio.com/2020/09/15/announcing-the-2020-rstudio-table-contest/'> 2020 RStudio Table Contest </a></h3>"
+author:  "A. Calatroni, S. Lussier & R. Krouse"
+output:
+  html_document:
+    self_containded: TRUE
+    code_download: yes
+    code_folding: none # none hide show
+    toc: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, comment = NA, include = FALSE)
+knitr::opts_chunk$set(cache = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(rio)
+library(lubridate)
+# devtools::install_github("rstudio/gt")
+library(gt)
+library(countrycode)
+library(echarts4r)
+library(htmltools)
+library(rvest)
+library(httr)
+```
+
+```{r}
+bm_1 <- import("https://raw.githubusercontent.com/TheEconomist/big-mac-data/master/output-data/big-mac-full-index.csv") %>%
+   select(-starts_with(c("GBP","JPY","CNY"))) %>% 
+   mutate(iso_a2    = countrycode(iso_a3 , origin = 'iso3c', destination = 'iso2c', warn = FALSE),
+          iso_a2    = str_to_lower(iso_a2),
+          iso_a2    = ifelse(is.na(iso_a2), "european_union", iso_a2),
+          iso_fl    = str_glue("https://raw.githubusercontent.com/HatScripts/circle-flags/master/flags/{iso_a2}.svg")) %>% 
+   group_by(iso_a3, iso_a2, name, currency_code, iso_fl) %>% 
+   nest_by()
+
+x_currencies       <- import("https://raw.githubusercontent.com/rstudio/gt/master/data-raw/x_currencies.csv") %>% 
+   rename(currency_code = curr_code ) %>% 
+   mutate(curr_name = word(curr_name,-1) %>% str_to_title())
+
+bm_1 <- left_join(bm_1,
+                  x_currencies,
+                  by = "currency_code")
+```
+
+```{r}
+# G20 Group of countries
+# 2020: Argentina, Australia, Brazil, Canada, China, France, Germany, Italy, India, Indonesia,Japan, Republic of Korea, 
+#       Mexico, Russia, Saudi Arabia, South Africa, Turkey, United Kingdom, United States European Union
+# + Switzerland
+
+bm_g20 <- bm_1 %>% 
+   filter(iso_a3 %in% c("ARG","AUS","BRA","CAN","CHN","EUZ","IND","IDN","JPN","KOR","MEX","RUS","SAU","ZAF","TUR","USA",
+                        "CHE")) %>%
+   mutate( name_map = name,
+           name_map = case_when(name_map == "Euro area" ~ "Europe-EU",
+                                name_map == "Russia"    ~ "Russian Federation",
+                                name_map == "China"     ~ "People's_Republic_of_China",
+                                TRUE ~ as.character(name_map)
+           )) %>% 
+   mutate(last = list( data %>% slice(n())) ) %>%
+   mutate( map = list(
+      glue::glue("https://commons.wikimedia.org/wiki/File:{str_replace_all(name_map,' ', '_')}_(orthographic_projection).svg") %>%
+         read_html() %>%
+         html_nodes("img") %>%
+         html_attr("src") %>%
+         as.data.frame() %>%
+         transform(`.` = as.character(`.`)) %>%
+         filter(grepl("orthographic", ., perl=TRUE)) %>%
+         slice(1) %>%
+         pull()
+   )
+   ) %>%
+   unnest(last) %>% 
+   ungroup()
+```
+
+```{r}
+chart <- function(data = data, variable = variable, name = name,
+                  start = start, end = end,
+                  width = width, height = height){
+   
+   d <- data %>% 
+      select(date, var = variable) %>% 
+      mutate(date = as.Date(date)) %>% 
+      drop_na(var)
+   
+   m <- mean(d %>% pull(var))
+   
+   e <- d %>% 
+      e_charts(x = date,
+               width = width,
+               height = height
+      ) %>% 
+      e_bar(var,
+            name = name,
+            barWidth = "75%") %>%
+      e_legend(show = FALSE) %>%
+      e_y_axis(show = FALSE,
+               max  = 1,
+               min = -1) %>%
+      e_x_axis(show = FALSE,
+               min = start,
+               max = end) %>%
+      e_axis_pointer(label = list(show = FALSE)) %>% 
+      e_visual_map(
+         type = "piecewise",
+         pieces = list(list(gt = 0,
+                            color = "#0571B0"),
+                       list(lte = 0,
+                            color = "#CA0020")
+         ),
+         show = FALSE,
+      ) 
+   
+   if ( abs(m)>0 && nrow(d)>0 ) {
+      e <- e %>% 
+         e_mark_line(data = list(yAxis = 0),
+                     title = '',
+                     silent = TRUE,
+                     symbol = 'none',
+                     animation = FALSE,
+                     label = list(show = TRUE,
+                                  postion = 'end',
+                                  distance = 0),
+                     lineStyle = list(color = '#bfbfbf',
+                                      type = 'solid')
+         ) %>%
+         e_mark_area(data = list(
+            list(xAxis = '2011-06-01', yAxis = -1),
+            list(xAxis = '2020-08-01', yAxis =  1)),
+            itemStyle = list(color = '#f2f2f2')) %>%
+         e_tooltip( trigger = "axis",
+                    axisPointer = list(type = 'shadow'),
+                    confine = TRUE,
+                    formatter = e_tooltip_pointer_formatter("percent", digits = 1),
+                    textStyle = list(fontSize = 10),
+                    padding = 2)
+   }
+   e
+}
+```
+
+```{r}
+bm_g20 <- bm_g20 %>% 
+   rowwise() %>% 
+   mutate(eraw = list(chart(data,
+                            variable = "USD_raw", name = "Raw", 
+                            start = '2000-03-01',
+                            end   = '2020-08-01',
+                            width = 150, height = 50)),
+          eadj = list(chart(data,
+                            variable = "USD_adjusted", name = "Adj", 
+                            start = '2011-06-01',
+                            end   = '2020-08-01',
+                            width = 75, height = 50))
+   ) %>% 
+   mutate(eraw_html = list( eraw %>%
+                               as.tags() %>%
+                               as.character() %>%
+                               htmltools::HTML() ),
+          eadj_html = list( eadj %>%
+                               as.tags() %>%
+                               as.character() %>%
+                               htmltools::HTML() )
+   )
+```
+
+
+```{r}
+detach("package:rvest", unload = TRUE)
+detach("package:httr",  unload = TRUE)
+```
+
+```{r}
+chart(data = bm_g20 %>% filter(iso_a3 == "ARG") %>% select(data) %>% unnest(),
+      variable = "USD_raw", name = "Raw", 
+      start = '2000-01-01',
+      end   = '2021-01-01',
+      width = 150, height = 50)
+```
+
+```{r include = TRUE, echo = FALSE}
+tab_0 <- bm_g20 %>%
+   select(iso_fl, name, map, iso_a3,
+          currency_code, curr_name, symbol,
+          date, local_price, dollar_price, 
+          USD_raw, USD_adjusted, eraw_html, eadj_html) %>%
+   arrange(desc(USD_raw)) %>% 
+   gt() %>% 
+   # add country hyperlink
+   text_transform(
+      locations = cells_body(
+         columns = vars(name)
+      ),
+      fn = function(x) {
+         glue::glue("<a href='https://en.wikipedia.org/wiki/{str_replace_all(x,' ', '_')}'>{x}</a>")
+      }
+   ) %>%
+   # add flags
+   text_transform(
+      locations = cells_body(
+         columns = vars(iso_fl)
+      ),
+      fn = function(x) {web_image(url = x, height = 30)}
+   ) %>% 
+   # add maps
+   text_transform(
+      locations = cells_body(
+         columns = vars(map)
+      ),
+      fn = function(x) {web_image(url = x, height = 50)}
+   ) %>% 
+   # merge currency name & code
+   cols_merge(columns = vars(curr_name, currency_code),
+              pattern = html("{1} (<small>{2}</small>)") ) 
+
+# merge currencies to local price
+for (i in seq(nrow(bm_g20))) {
+   tab_0 <- tab_0 %>% 
+      fmt_currency(columns = vars(local_price), 
+                   rows = i, 
+                   currency  = bm_g20[[i, "currency_code"]])
+}
+
+tab_1 <- tab_0 %>% 
+   # remove unused variables
+   cols_hide(columns = vars(iso_a3, symbol, date)) %>% 
+   # rename variables
+   cols_label( iso_fl = ' ',
+               map    = 'Map',
+               name   = 'Country',
+               curr_name = html('Currency <small>(Abbr)</small>'),
+               date = html('Date <small>(yy-mm)</small>'),
+               eraw_html = html("<small>2000 &#8594; <font style='color: #bfbfbf'> 2011 &#8594; 2020</small></font> <br> Raw"), 
+               eadj_html = html("<small><font style='color: #bfbfbf'>2011 &#8594; 2020</small></font> <br> Adjusted")
+   ) %>% 
+   # align data
+   cols_align(align = "center", 
+              columns = vars(map, local_price, dollar_price, USD_raw, USD_adjusted)) %>%
+   cols_align(align = "left",
+              columns = vars(name, curr_name)) %>% 
+   # align columns labels
+   tab_style(
+      style = list(
+         cell_text(align = "left")
+      ),
+      locations = cells_column_labels(
+         columns = vars(name, curr_name)
+      )
+   ) %>% 
+   # make map square cell
+   cols_width(
+      vars(map) ~ px(60)
+   ) %>% 
+   # format missing
+   fmt_missing( columns = vars(USD_adjusted),
+                missing_text = html("&mdash;")
+   ) %>% 
+   # format percent
+   fmt_percent(columns = vars(USD_raw, USD_adjusted),
+               decimals = 1) %>% 
+   # round dollar price
+   fmt_number(columns = vars(dollar_price),
+              decimals  = 2) %>% 
+   # add dollar sign
+   fmt_currency(columns = vars(dollar_price),
+                currency = "USD") %>% 
+   # spanner
+   tab_spanner(
+      label = html("&#127991;&#65039; Latest Price"),
+      columns = vars(local_price, dollar_price)
+   ) %>% 
+   # spanner
+   tab_spanner(
+      label = html("&#128181; USD <small><font style='color: #CA0020'>under</font>/<font style='color: #0571B0'>over</font></small>"),
+      columns = vars(USD_raw, USD_adjusted)
+   ) %>% 
+   # Spanner
+   tab_spanner(
+      label = html("&#9201;&#65039; Historical Data"),
+      columns = vars(eraw_html, eadj_html)
+   ) %>% 
+   # labels
+   cols_label(local_price = "Local",
+              dollar_price = "Dollar" ) %>% 
+   cols_label(USD_raw = "Raw",
+              USD_adjusted = "Adjusted" ) %>% 
+   # Add color USD Raw & Udjusted
+   data_color(
+      columns = vars(USD_raw, USD_adjusted),
+      colors = scales::col_bin(
+         bins = c(-Inf, 0, Inf),
+         palette = c("#CA0020","#0571B0")
+      ),
+      apply_to = "text"
+   ) %>% 
+   # Add color to dollar price RColorBrewer::brewer.pal(11,"RdYlBu")[1:10]
+   data_color(
+      columns = vars(dollar_price),
+      colors = scales::col_bin(
+         palette = c("#A50026","#D73027","#F46D43","#FDAE61","#FEE090",
+                     "#FFFFBF",
+                     "#E0F3F8","#ABD9E9","#74ADD1", "#4575B4"),
+         domain = c(0,1,2,3,4,5,6,7,8,9,10),
+         bins = 10),
+      alpha = 0.5
+   )%>%
+   # make cells bold
+   tab_style(
+      style = list(
+         cell_text(weight = "bold")
+      ),
+      locations = cells_body(
+         columns = vars(USD_raw, USD_adjusted)
+      )
+   ) %>% 
+   # make US the baseline
+   tab_style(
+      style = cell_fill(color = "#FFFFBF", alpha = 0.5),
+      locations = cells_body(
+         rows = name  == "United States"
+      )
+   ) %>%
+   # add a title
+   tab_header(
+      title    = md("**Burgernomics:** The Big Mac &#127828; Index for [G20](https://en.wikipedia.org/wiki/G20)"),
+      subtitle = md("Measuring the purchasing power parity (PPP) between two currencies")
+   ) %>% 
+   # add source
+   tab_source_note(
+      html('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"> 
+           <b>Source:</b>
+           <a href="https://www.economist.com/news/2020/07/15/the-big-mac-index"> 
+           The Economist: The Big Mac Index </a> introduced in  1986 as a semi-humorous illustration of PPP and has been published since then.
+           <br>
+           <a href="https://twitter.com/search?q=The%20Economist%27s%20Big%20Mac%20index%20&src=typed_query"> <i class="fa fa-twitter"style="font-size:24px"></i> The Economist Big Mac index  </a>
+           <br>
+           <a href="https://github.com/TheEconomist/big-mac-data"> <i class="fa fa-github" style="font-size:24px"></i> Data and methodology </a>
+           ')
+      
+   ) %>% 
+   tab_source_note( md( { details::details(devtools::session_info(),
+                                           summary = 'R Session Information'
+   ) 
+   }
+   )
+   ) %>% 
+   # footnotes
+   tab_footnote(
+      footnote = "Data as of 2020-07-01",
+      locations = cells_column_spanners(html("&#127991;&#65039; Latest Price"))
+   ) %>% 
+   tab_footnote(
+      footnote = 
+         "The index is based on the theory of PPP, the notion that in the long run exchange rates should move towards the rate
+      that would equalise the prices of an identical basket of goods and services (in this case, a burger) in any two countries.",
+      locations = cells_title("subtitle")
+   ) %>% 
+   tab_footnote(
+      footnote = "Raw Index: % cost difference than in the US",
+      locations = cells_column_labels(vars(USD_raw,eraw_html))
+   ) %>% 
+   tab_footnote(
+      footnote = "GDP Adjusted Index: % cost difference than in the US based on differences in GDP between the two countries",
+      locations = cells_column_labels(vars(USD_adjusted,eadj_html))
+   ) %>% 
+   tab_footnote(
+      footnote = "Base Currency",
+      locations = cells_body( 
+         columns = vars(local_price, dollar_price),
+         rows = name  == "United States")
+   ) %>% 
+   tab_footnote(
+      footnote = md('ABBR: Three-character [ISO 4217 currency code](https://www.iso.org/iso-4217-currency-codes.html)'),
+      locations = cells_column_labels(vars(curr_name))
+   ) %>%
+   tab_footnote(
+      footnote = html('Price of a Big Mac in the local currency'),
+      locations = cells_column_labels(vars(local_price))
+   ) %>% 
+   tab_footnote(
+      footnote = html('Price of a Big Mac in dollars <br>
+                       <span style="background-color: #A50026; opacity: 0.5;"> &emsp;&emsp;&nbsp;</span>
+                       <span style="background-color: #D73027; opacity: 0.5;"> &emsp;&emsp;</span>
+                       <span style="background-color: #F46D43; opacity: 0.5;"> &emsp;&emsp;</span>
+                       <span style="background-color: #FDAE61; opacity: 0.5;"> &emsp;&emsp;</span>
+                       <span style="background-color: #FEE090; opacity: 0.5;"> &emsp;&emsp;</span>
+                       <span style="background-color: #FFFFBF; opacity: 0.5;"> &emsp;&emsp;</span>
+                       <span style="background-color: #E0F3F8; opacity: 0.5;"> &emsp;&emsp;</span>
+                       <span style="background-color: #ABD9E9; opacity: 0.5;"> &emsp;&emsp;</span>
+                       <span style="background-color: #74ADD1; opacity: 0.5;"> &emsp;&emsp;</span>
+                       <span style="background-color: #4575B4; opacity: 0.5;"> &emsp;&emsp;&nbsp;&nbsp;</span>
+                       <br>
+                       <span style="color: black;">      $0-1&nbsp;</span>
+                       <span style="color: black;"> &nbsp;1-2&nbsp;</span>
+                       <span style="color: black;"> &nbsp;2-3&nbsp;</span>
+                       <span style="color: black;"> &nbsp;3-4&nbsp;</span>
+                       <span style="color: black;"> &nbsp;4-5&nbsp;</span>
+                       <span style="color: black;"> &nbsp;5-6&nbsp;</span>
+                       <span style="color: black;"> &nbsp;6-7&nbsp;</span>
+                       <span style="color: black;"> &nbsp;7-8&nbsp;</span>
+                       <span style="color: black;"> &nbsp;8-9&nbsp;</span>
+                       <span style="color: black;"> &nbsp;9-10&nbsp;</span>
+                         '),
+      locations = cells_column_labels(vars(dollar_price))
+   ) %>% 
+   # transparent trick: do not print 0%
+   tab_style(
+      style = cell_text(color = 'transparent'),
+      locations = cells_body(
+         columns = vars(USD_raw, USD_adjusted),
+         rows = name  == "United States")
+   ) %>%
+   # add options left align
+   opt_align_table_header( align = "left") %>% 
+   # upper
+   opt_all_caps(locations = "column_labels") %>% 
+   # theme compact
+   tab_options(table.font.size      = px(14),
+               data_row.padding     = px(1),
+               footnotes.padding    = px(1),
+               source_notes.padding = px(1),
+               row_group.padding    = px(1)) %>% 
+   # add CSS
+   opt_css(css = ".html-widget {margin-bottom: 0px;}") %>% 
+   opt_css(css = ".gt_row:nth-child( 9){overflow-y: hidden;}") %>% 
+   opt_css(css = ".gt_row:nth-child(10){overflow-y: hidden;}")%>%
+   # change font
+   opt_table_font(
+      font = list(google_font(name = "Source Sans Pro"))
+   ) 
+
+tab_1
+```
+
+
