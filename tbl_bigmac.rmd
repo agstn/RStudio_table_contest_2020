@@ -1,6 +1,5 @@
 ---
-title:   "<h3> <a href='https://blog.rstudio.com/2020/09/15/announcing-the-2020-rstudio-table-contest/'> 2020 RStudio Table Contest </a></h3>"
-author:  "A. Calatroni, S. Lussier & R. Krouse"
+title:   "<h4> <a href='https://blog.rstudio.com/2020/09/15/announcing-the-2020-rstudio-table-contest/'> 2020 RStudio Table Contest Submission </a> by A. Calatroni, S. Lussier & R. Krouse <a href='https://github.com/agstn/RStudio_table_contest_2020'> <i class='fa fa-github'></i> Repo </a>"
 output:
   html_document:
     self_containded: TRUE
@@ -185,7 +184,7 @@ chart(data = bm_g20 %>% filter(iso_a3 == "ARG") %>% select(data) %>% unnest(),
 
 ```{r include = TRUE, echo = FALSE}
 tab_0 <- bm_g20 %>%
-   select(iso_fl, name, map, iso_a3,
+   select(iso_fl, map, name, iso_a3,
           currency_code, curr_name, symbol,
           date, local_price, dollar_price, 
           USD_raw, USD_adjusted, eraw_html, eadj_html) %>%
@@ -231,7 +230,7 @@ tab_1 <- tab_0 %>%
    cols_hide(columns = vars(iso_a3, symbol, date)) %>% 
    # rename variables
    cols_label( iso_fl = ' ',
-               map    = 'Map',
+               map    = ' ',
                name   = 'Country',
                curr_name = html('Currency <small>(Abbr)</small>'),
                date = html('Date <small>(yy-mm)</small>'),
@@ -327,7 +326,7 @@ tab_1 <- tab_0 %>%
    ) %>%
    # add a title
    tab_header(
-      title    = md("**Burgernomics:** The Big Mac &#127828; Index for [G20](https://en.wikipedia.org/wiki/G20)"),
+      title    = md("**Burgernomics:** The Big Mac &#127828; Index for [G20](https://en.wikipedia.org/wiki/G20) compared to the US Dollar"),
       subtitle = md("Measuring the purchasing power parity (PPP) between two currencies")
    ) %>% 
    # add source
@@ -370,9 +369,10 @@ tab_1 <- tab_0 %>%
    ) %>% 
    tab_footnote(
       footnote = "Base Currency",
-      locations = cells_body( 
-         columns = vars(local_price, dollar_price),
-         rows = name  == "United States")
+      locations = list( cells_title("title"),
+                        cells_body( columns = vars(local_price, dollar_price),
+                                    rows = name  == "United States")
+      )
    ) %>% 
    tab_footnote(
       footnote = md('ABBR: Three-character [ISO 4217 currency code](https://www.iso.org/iso-4217-currency-codes.html)'),
@@ -436,5 +436,3 @@ tab_1 <- tab_0 %>%
 
 tab_1
 ```
-
-
