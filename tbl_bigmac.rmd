@@ -74,7 +74,8 @@ bm_g20 <- bm_1 %>%
    )
    ) %>%
    unnest(last) %>% 
-   ungroup()
+   ungroup() %>% 
+   arrange(desc(USD_raw)) 
 ```
 
 ```{r}
@@ -188,7 +189,6 @@ tab_0 <- bm_g20 %>%
           currency_code, curr_name, symbol,
           date, local_price, dollar_price, 
           USD_raw, USD_adjusted, eraw_html, eadj_html) %>%
-   arrange(desc(USD_raw)) %>% 
    gt() %>% 
    # add country hyperlink
    text_transform(
