@@ -1,5 +1,7 @@
 # RStudio Table Contest 2020 Submission
 
+## [The Big Mac Index Table](https://rpubs.com/acalatroni/682678)
+
 Our goal for the [2020 RStudio Table Contest](https://blog.rstudio.com/2020/09/15/announcing-the-2020-rstudio-table-contest/) was to learn and practice with the [gt package](https://gt.rstudio.com/). To do so we decided to focus on the following aspects: 
 -	Include interactive figures within the table. For this, we chose the [echarts4r package](https://echarts4r.john-coene.com/) to create interactive graphics with Echarts Javascripts, albeit other packages would have also worked (ie. Plotly, highcharter, etc.)
 -	Include images, either through a [GitHub](https://github.com/HatScripts/circle-flags) repo (flags) or Wikimedia commons scraping (maps)
