@@ -4,8 +4,8 @@
 
 Our goal for the [2020 RStudio Table Contest](https://blog.rstudio.com/2020/09/15/announcing-the-2020-rstudio-table-contest/) was to learn and practice with the [gt package](https://gt.rstudio.com/). To do so we decided to focus on the following aspects: 
 -	Include interactive figures within the table. For this, we chose the [echarts4r package](https://echarts4r.john-coene.com/) to create interactive graphics with Echarts Javascripts, albeit other packages would have also worked (ie. Plotly, highcharter, etc.)
--	Include images, either through a [GitHub](https://github.com/HatScripts/circle-flags) repo (flags) or Wikimedia commons scraping (maps)
--	Include as many HTML tricks as necessary to improve the overall readability of the table (for example HTML color of headers, icons, spanners, hyperlinks, currency symbols, etc.)
+-	Include images, either through a [GitHub](https://github.com/HatScripts/circle-flags) repo (flags) or Wikimedia commons scraping (maps). 
+-	Include as many HTML tricks as necessary to improve the overall readability of the table (for example HTML color of headers, icons, spanners, hyperlinks, currency symbols,  scale up the image size (maps) on hover, etc.)
 -	Include footnotes, in particular a footnote color legend for the color column, an HTML details tab to display in an inconspicuous way the R session information, and font awesome icons for github and twitter hyperlinks).  
 - Include CSS with the [new feature](https://github.com/rstudio/gt/releases/tag/v0.2.2) `opt_css` to improve the tables aesthetics, especially in light of the interactive graphics tweaking.
 
