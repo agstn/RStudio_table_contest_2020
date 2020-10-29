@@ -100,8 +100,8 @@ chart <- function(data = data, variable = variable, name = name,
             barWidth = "75%") %>%
       e_legend(show = FALSE) %>%
       e_y_axis(show = FALSE,
-               max  = 1,
-               min = -1) %>%
+               max  = 1.0,
+               min = -1.0) %>%
       e_x_axis(show = FALSE,
                min = start,
                max = end) %>%
@@ -130,8 +130,8 @@ chart <- function(data = data, variable = variable, name = name,
                                       type = 'solid')
          ) %>%
          e_mark_area(data = list(
-            list(xAxis = '2011-06-01', yAxis = -1),
-            list(xAxis = '2020-08-01', yAxis =  1)),
+            list(xAxis = '2011-06-01', yAxis = -1.0),
+            list(xAxis = '2020-08-01', yAxis =  1.0)),
             itemStyle = list(color = '#f2f2f2')) %>%
          e_tooltip( trigger = "axis",
                     axisPointer = list(type = 'shadow'),
@@ -428,7 +428,8 @@ tab_1 <- tab_0 %>%
    # add CSS
    opt_css(css = ".html-widget {margin-bottom: 0px;}") %>% 
    opt_css(css = ".gt_row:nth-child( 9){overflow-y: hidden;}") %>% 
-   opt_css(css = ".gt_row:nth-child(10){overflow-y: hidden;}")%>%
+   opt_css(css = ".gt_row:nth-child(10){overflow-y: hidden;}") %>%
+   opt_css(css = ".gt_row:nth-child( 2):hover{transform: scale(2);}") %>% 
    # change font
    opt_table_font(
       font = list(google_font(name = "Source Sans Pro"))
